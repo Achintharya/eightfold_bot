@@ -89,6 +89,8 @@ class CompanyResearchAgent:
         # Route to appropriate handler
         if intent == "company_name":
             return await self._handle_company_research(user_input)
+        elif intent == "question_about_company":
+            return await self._answer_from_research(user_input)
         elif intent == "edit_request":
             return await self._handle_edit_request(user_input)
         elif intent == "save_plan":
@@ -132,7 +134,30 @@ class CompanyResearchAgent:
         if self.state == ResearchState.GATHERING_INFO:
             return "clarification"
         
-        # Check for company name patterns
+        # Check if this is a question about current company (if we have research data)
+        if self.current_company and self.context_summary:
+            # Check for explicit new research request
+            if any(phrase in input_lower for phrase in ["research", "look up", "look into", "find information about"]):
+                # Check if it's about a different company
+                company_patterns = [
+                    r"research\s+(\w+[\w\s]*)",
+                    r"look\s+(?:up|into)\s+(\w+[\w\s]*)",
+                    r"information\s+(?:on|about)\s+(\w+[\w\s]*)",
+                ]
+                for pattern in company_patterns:
+                    match = re.search(pattern, input_lower)
+                    if match:
+                        potential_company = match.group(1).strip()
+                        # If it's a different company, treat as new research
+                        if potential_company.lower() != self.current_company.lower():
+                            return "company_name"
+                # Same company - answer from existing research
+                return "question_about_company"
+            else:
+                # Any other question - answer from existing research
+                return "question_about_company"
+        
+        # Check for company name patterns (for initial research)
         company_patterns = [
             r"research\s+(\w+[\w\s]*)",
             r"look\s+(?:up|into)\s+(\w+[\w\s]*)",
@@ -521,6 +546,28 @@ The plan has been preserved and can be accessed anytime from the data folder."""
             
         except Exception as e:
             return f"Error saving plan: {str(e)}"
+    
+    async def _answer_from_research(self, user_input: str) -> str:
+        """Answer questions based on existing research data"""
+        if not self.context_summary or not self.current_company:
+            return "I don't have any research data loaded. Please research a company first."
+        
+        # Use the existing research to answer the question
+        query = f"""Based on the research data about {self.current_company}, answer this question: {user_input}
+        
+        Be concise and specific. If the information is not available in the research, say so clearly."""
+        
+        try:
+            response = generate_chat_response(
+                self.context_summary,
+                query,
+                silent_mode=True
+            )
+            
+            return f"Based on my research about {self.current_company}:\n\n{response}"
+            
+        except Exception as e:
+            return f"Error answering question: {str(e)}"
     
     async def _handle_clarification(self, user_input: str) -> str:
         """Handle clarification from user"""
