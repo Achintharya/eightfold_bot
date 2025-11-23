@@ -14,8 +14,7 @@ function App() {
   const [accountPlans, setAccountPlans] = useState([]);
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [showPlanModal, setShowPlanModal] = useState(false);
-  const [streamingContent, setStreamingContent] = useState('');
-  const [isStreaming, setIsStreaming] = useState(false);
+  const [editingPlan, setEditingPlan] = useState(null);
   const messagesEndRef = useRef(null);
 
   // Scroll to bottom of messages
@@ -72,14 +71,25 @@ function App() {
         message: userMessage
       });
 
+      // Check if response includes a plan summary
+      let displayContent = response.data.response;
+      if (response.data.plan_summary) {
+        displayContent += "\n\n**Account Plan Summary:**\n" + response.data.plan_summary;
+      }
+
       setMessages(prev => [...prev, { 
         type: 'agent', 
-        content: response.data.response 
+        content: displayContent 
       }]);
 
       // Refresh plans if a new one was created
-      if (response.data.state === 'complete') {
+      if (response.data.state === 'complete' || response.data.plan_created) {
         fetchPlans();
+      }
+
+      // If editing mode, update the editing plan
+      if (response.data.editing_plan) {
+        setEditingPlan(response.data.editing_plan);
       }
     } catch (error) {
       setMessages(prev => [...prev, { 
@@ -102,42 +112,31 @@ function App() {
     }
   };
 
-  // Stream content generation
-  const streamContent = async () => {
-    const testContext = "Company XYZ is a leading technology firm specializing in AI solutions.";
-    const testQuery = "Write a brief executive summary for this company.";
-    
-    setIsStreaming(true);
-    setStreamingContent('');
-
+  // Edit plan section
+  const editPlanSection = async (section, instructions) => {
+    setIsLoading(true);
     try {
-      const eventSource = new EventSource(
-        `${API_URL}/generate/stream?context=${encodeURIComponent(testContext)}&query=${encodeURIComponent(testQuery)}`
-      );
+      const response = await axios.post(`${API_URL}/edit-plan`, {
+        section: section,
+        instructions: instructions
+      });
 
-      eventSource.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        
-        if (data.done) {
-          eventSource.close();
-          setIsStreaming(false);
-        } else if (data.error) {
-          console.error('Streaming error:', data.error);
-          eventSource.close();
-          setIsStreaming(false);
-        } else if (data.content) {
-          setStreamingContent(prev => prev + data.content);
-        }
-      };
+      setMessages(prev => [...prev, { 
+        type: 'agent', 
+        content: response.data.response 
+      }]);
 
-      eventSource.onerror = (error) => {
-        console.error('EventSource error:', error);
-        eventSource.close();
-        setIsStreaming(false);
-      };
+      // Refresh plans after edit
+      if (response.data.success) {
+        fetchPlans();
+      }
     } catch (error) {
-      console.error('Error streaming content:', error);
-      setIsStreaming(false);
+      setMessages(prev => [...prev, { 
+        type: 'error', 
+        content: 'Error editing plan: ' + error.message 
+      }]);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -236,22 +235,21 @@ function App() {
             </div>
           </div>
 
-          {/* Streaming Demo */}
-          <div className="streaming-section">
-            <h3>🔄 Streaming Demo</h3>
-            <button 
-              onClick={streamContent} 
-              disabled={isStreaming}
-              className="stream-button"
-            >
-              {isStreaming ? 'Streaming...' : 'Start Streaming'}
-            </button>
-            {streamingContent && (
-              <div className="streaming-content">
-                <ReactMarkdown>{streamingContent}</ReactMarkdown>
+          {/* Current Research Status */}
+          {currentCompany && agentStatus !== 'idle' && (
+            <div className="current-research">
+              <h3>📊 Current Research</h3>
+              <div className="research-info">
+                <p><strong>Company:</strong> {currentCompany}</p>
+                <p><strong>Status:</strong> {agentStatus.replace('_', ' ')}</p>
+                {agentStatus === 'complete' && (
+                  <button onClick={() => setInputMessage('Show me a summary of the plan')}>
+                    View Summary
+                  </button>
+                )}
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
           {/* Quick Actions */}
           <div className="quick-actions">

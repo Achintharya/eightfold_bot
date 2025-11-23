@@ -37,6 +37,9 @@ app.add_middleware(
 # Global agent instance (in production, use proper session management)
 agent = CompanyResearchAgent(ConversationMode.NORMAL)
 
+# Cache for company research data
+research_cache = {}
+
 # Request/Response models
 class ResearchRequest(BaseModel):
     company_name: str
@@ -96,16 +99,42 @@ async def research_company(request: ResearchRequest, background_tasks: Backgroun
 @app.post("/chat")
 async def chat_with_agent(request: ChatRequest):
     """
-    Chat with the agent
+    Chat with the agent with caching and summary support
     """
     try:
+        # Check if asking for a summary
+        if "summary" in request.message.lower() and agent.account_plan:
+            summary = agent.get_plan_summary()
+            response = await agent.process_input(request.message)
+            
+            return {
+                "success": True,
+                "response": response,
+                "plan_summary": summary,
+                "state": agent.state.value,
+                "current_company": agent.current_company
+            }
+        
+        # Regular processing
         response = await agent.process_input(request.message)
+        
+        # Check if a plan was just created
+        plan_created = False
+        if agent.state.value == "complete" and agent.account_plan:
+            plan_created = True
+            # Also return a brief summary
+            summary = agent.get_plan_summary()
+        else:
+            summary = None
         
         return {
             "success": True,
             "response": response,
+            "plan_summary": summary,
+            "plan_created": plan_created,
             "state": agent.state.value,
-            "current_company": agent.current_company
+            "current_company": agent.current_company,
+            "editing_plan": agent.account_plan if agent.state.value == "editing" else None
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -121,33 +150,47 @@ async def get_agent_status() -> StatusResponse:
         state=agent.state.value
     )
 
-@app.post("/generate/stream")
-async def generate_stream(request: GenerateRequest):
+@app.post("/edit-plan")
+async def edit_plan_section(request: dict):
     """
-    Generate content with streaming
+    Edit a specific section of the account plan
     """
-    async def event_generator():
-        """Generate Server-Sent Events"""
-        try:
-            # Use the streaming function
-            for chunk in generate_chat_response_stream(request.context, request.query):
-                # Each chunk is already JSON formatted
-                yield f"data: {chunk}\n\n"
-            
-            # Send completion event
-            yield f"data: {json.dumps({'done': True})}\n\n"
-            
-        except Exception as e:
-            yield f"data: {json.dumps({'error': str(e)})}\n\n"
-    
-    return StreamingResponse(
-        event_generator(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
+    try:
+        section = request.get("section")
+        instructions = request.get("instructions")
+        
+        if not section or not instructions:
+            raise HTTPException(status_code=400, detail="Section and instructions required")
+        
+        # Process the edit request
+        response = await agent._handle_edit_request(f"edit {section} {instructions}")
+        
+        return {
+            "success": True,
+            "response": response,
+            "state": agent.state.value
         }
-    )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/cache/status")
+async def get_cache_status():
+    """
+    Get cache status and available cached companies
+    """
+    cached_companies = list(agent.research_cache.keys())
+    return {
+        "cached_companies": cached_companies,
+        "cache_size": len(cached_companies)
+    }
+
+@app.post("/cache/clear")
+async def clear_cache():
+    """
+    Clear the research cache
+    """
+    agent.research_cache.clear()
+    return {"success": True, "message": "Cache cleared"}
 
 @app.post("/generate")
 async def generate_content(request: GenerateRequest):

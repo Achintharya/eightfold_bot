@@ -47,6 +47,8 @@ class CompanyResearchAgent:
         self.research_data = {}
         self.account_plan = {}
         self.context_summary = ""
+        self.research_cache = {}  # Cache for company research data
+        self.plan_cache = {}  # Cache for generated plans
         
         # Agent always responds normally/professionally
         self.response_templates = {
@@ -147,7 +149,7 @@ class CompanyResearchAgent:
         return "general"
     
     async def _handle_company_research(self, user_input: str) -> str:
-        """Handle company research request"""
+        """Handle company research request with caching"""
         # Extract company name
         company_name = self._extract_company_name(user_input)
         
@@ -156,22 +158,57 @@ class CompanyResearchAgent:
             return self.get_response("clarify", info="the company name")
         
         self.current_company = company_name
+        
+        # Check if we have cached data for this company
+        if company_name in self.research_cache:
+            print(f"✅ Using cached research data for {company_name}")
+            response = f"I have existing research data for {company_name}. "
+            
+            # Check if we also have a cached plan
+            if company_name in self.plan_cache:
+                self.account_plan = self.plan_cache[company_name]
+                self.context_summary = self.research_cache[company_name]['summary']
+                self.state = ResearchState.COMPLETE
+                
+                response += "Loading the existing account plan.\n\n"
+                response += self.get_plan_summary()
+                response += "\n\nYou can:\n"
+                response += "- Ask me to edit any section of the plan\n"
+                response += "- Request a full view of the plan\n"
+                response += "- Ask for a fresh research update\n"
+                
+                return response
+            else:
+                # Use cached research to generate a new plan
+                self.context_summary = self.research_cache[company_name]['summary']
+                self.research_data[company_name] = self.research_cache[company_name]['data']
+                self.state = ResearchState.GENERATING_PLAN
+                response += "Generating a new account plan based on existing research...\n"
+                response += "\n" + await self._generate_account_plan()
+                return response
+        
+        # No cache - perform new research
         self.state = ResearchState.RESEARCHING
-        
-        # Start research process
-        response = f"Starting research on {company_name}...\n"
-        
-        # Provide initial update
+        response = f"Starting fresh research on {company_name}...\n"
         response += "I'll search for information about this company and gather data from multiple sources...\n"
         
         # Perform actual research
         try:
-            # Search and extract web content
             await self._perform_research(company_name)
             response += "\n" + self.get_response("update", status="research complete")
             
+            # Cache the research data
+            self.research_cache[company_name] = {
+                'data': self.research_data[company_name],
+                'summary': self.context_summary,
+                'timestamp': datetime.now().isoformat()
+            }
+            
             # Generate account plan
             response += "\n" + await self._generate_account_plan()
+            
+            # Cache the plan
+            self.plan_cache[company_name] = self.account_plan
             
         except Exception as e:
             response += f"\nError during research: {str(e)}"
@@ -278,7 +315,10 @@ class CompanyResearchAgent:
         with open(f"./account_plans/{plan_filename}", "w") as f:
             f.write(plan_output)
         
-        return f"Account plan generated and saved to {plan_filename}"
+        # Generate and return a summary
+        summary = self.get_plan_summary()
+        
+        return f"Account plan generated and saved to {plan_filename}\n\n{summary}"
     
     async def _handle_edit_request(self, user_input: str) -> str:
         """Enhanced handler for editing account plan sections with partial edits and regeneration"""
@@ -552,6 +592,49 @@ The plan has been preserved and can be accessed anytime from the data folder."""
             return company_name
         
         return None
+    
+    def get_plan_summary(self) -> str:
+        """Generate a concise summary of the account plan"""
+        if not self.account_plan:
+            return "No account plan available yet."
+        
+        summary = f"**📋 Account Plan Summary for {self.current_company}**\n\n"
+        
+        # Extract key points from each section
+        key_sections = {
+            "executive_summary": "**Executive Summary:**",
+            "business_challenges": "**Key Challenges:**",
+            "opportunities": "**Main Opportunities:**",
+            "proposed_solutions": "**Proposed Solutions:**",
+            "next_steps": "**Next Steps:**"
+        }
+        
+        for section_key, section_title in key_sections.items():
+            if section_key in self.account_plan:
+                content = self.account_plan[section_key]
+                # Take first 200 characters or first 2 sentences
+                sentences = content.split('. ')[:2]
+                brief = '. '.join(sentences)
+                if len(brief) > 200:
+                    brief = brief[:197] + "..."
+                summary += f"{section_title}\n{brief}\n\n"
+        
+        summary += "💡 *For the complete plan, click on the plan in the sidebar or ask me to show specific sections.*"
+        
+        return summary
+    
+    def clear_cache(self, company_name: str = None) -> str:
+        """Clear cache for a specific company or all companies"""
+        if company_name:
+            if company_name in self.research_cache:
+                del self.research_cache[company_name]
+            if company_name in self.plan_cache:
+                del self.plan_cache[company_name]
+            return f"Cache cleared for {company_name}"
+        else:
+            self.research_cache.clear()
+            self.plan_cache.clear()
+            return "All cache cleared"
 
 
 class InteractiveSession:
