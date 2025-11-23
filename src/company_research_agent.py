@@ -91,6 +91,14 @@ class CompanyResearchAgent:
             return await self._handle_company_research(user_input)
         elif intent == "question_about_company":
             return await self._answer_from_research(user_input)
+        elif intent == "confused_request":
+            return await self._handle_confused_user(user_input)
+        elif intent == "efficient_request":
+            return await self._handle_efficient_request(user_input)
+        elif intent == "empty_input":
+            return "I didn't receive any input. How can I help you research a company?"
+        elif intent == "emoji_only":
+            return "I see you're using emojis! 😊 But I need text to understand what company you'd like to research."
         elif intent == "edit_request":
             return await self._handle_edit_request(user_input)
         elif intent == "save_plan":
@@ -110,20 +118,35 @@ class CompanyResearchAgent:
         """Detect the user's intent from their input"""
         input_lower = user_input.lower()
         
+        # Handle empty/nonsense input
+        if not user_input.strip() or len(user_input.strip()) < 2:
+            return "empty_input"
+        
+        # Check for emojis only
+        if all(ord(c) > 127 for c in user_input.strip()):
+            return "emoji_only"
+        
         # Check for exit commands
         if any(word in input_lower for word in ["exit", "quit", "bye", "goodbye"]):
             return "exit"
         
         # Check for help requests
-        if any(word in input_lower for word in ["help", "what can you do", "how do you work"]):
+        if any(word in input_lower for word in ["help", "what can you do", "how do you work", "what should i do"]):
             return "help"
+        
+        # Check for confused/vague requests (high priority for confused users)
+        if any(phrase in input_lower for phrase in [
+            "i don't know", "not sure", "confused", "what should", "can you tell me what",
+            "where to start", "i just need something", "idk"
+        ]):
+            return "confused_request"
         
         # Check for save requests
         if any(word in input_lower for word in ["save", "export", "store", "keep"]) and self.account_plan:
             return "save_plan"
         
         # Check for status inquiries
-        if any(word in input_lower for word in ["status", "progress", "how's it going", "update"]):
+        if any(word in input_lower for word in ["status", "progress", "how's it going", "update"]) and self.state != ResearchState.IDLE:
             return "status_check"
         
         # Check for edit requests
@@ -137,12 +160,13 @@ class CompanyResearchAgent:
         # Check if this is a question about current company (if we have research data)
         if self.current_company and self.context_summary:
             # Check for explicit new research request
-            if any(phrase in input_lower for phrase in ["research", "look up", "look into", "find information about"]):
+            if any(phrase in input_lower for phrase in ["research", "look up", "look into", "find information about", "create account plan", "generate plan"]):
                 # Check if it's about a different company
                 company_patterns = [
                     r"research\s+(\w+[\w\s]*)",
                     r"look\s+(?:up|into)\s+(\w+[\w\s]*)",
                     r"information\s+(?:on|about)\s+(\w+[\w\s]*)",
+                    r"(?:account plan|plan)\s+(?:for|about)\s+(\w+[\w\s]*)",
                 ]
                 for pattern in company_patterns:
                     match = re.search(pattern, input_lower)
@@ -157,20 +181,31 @@ class CompanyResearchAgent:
                 # Any other question - answer from existing research
                 return "question_about_company"
         
-        # Check for company name patterns (for initial research)
-        company_patterns = [
-            r"research\s+(\w+[\w\s]*)",
-            r"look\s+(?:up|into)\s+(\w+[\w\s]*)",
-            r"information\s+(?:on|about)\s+(\w+[\w\s]*)",
-            r"tell\s+me\s+about\s+(\w+[\w\s]*)",
-            r"^(\w+[\w\s]*)$"  # Just the company name
+        # Check for EXPLICIT research requests only
+        explicit_research_patterns = [
+            r"(?:please\s+)?research\s+(\w+[\w\s]*)",
+            r"(?:create|generate|make|need|want)\s+(?:an?\s+)?(?:account\s+)?plan\s+(?:for|about)\s+(\w+[\w\s]*)",
+            r"(?:i\s+)?(?:need|want)\s+(?:an?\s+)?(?:account\s+)?plan\s+(?:for|about)\s+(\w+[\w\s]*)",
+            r"(?:i\s+)?(?:need|want)\s+(?:to\s+)?research\s+(\w+[\w\s]*)",
+            r"look\s+up\s+(\w+[\w\s]*)\s+(?:company|corporation|inc|ltd)",
         ]
         
-        for pattern in company_patterns:
+        for pattern in explicit_research_patterns:
             match = re.search(pattern, input_lower)
             if match:
                 return "company_name"
         
+        # Check for request for specific info types (efficient users)
+        if any(phrase in input_lower for phrase in [
+            "key decision", "top risks", "bullet points", "summary", 
+            "just give me", "quick overview"
+        ]):
+            if self.current_company and self.context_summary:
+                return "question_about_company"
+            else:
+                return "efficient_request"
+        
+        # Default to general conversation (not automatic research)
         return "general"
     
     async def _handle_company_research(self, user_input: str) -> str:
@@ -593,42 +628,121 @@ The plan has been preserved and can be accessed anytime from the data folder."""
         """Provide help information"""
         return self.response_templates.get("help", "")
     
+    async def _handle_confused_user(self, user_input: str) -> str:
+        """Handle confused/vague requests with guidance"""
+        responses = [
+            """I can see you're not sure where to start. Let me help! 
+            
+To create an account plan, I need:
+1. The company name you want to research
+
+That's it! Just say something like "Research Microsoft" or "Create account plan for Tesla"
+
+What company are you interested in?""",
+            
+            """No worries! I'm here to guide you. An account plan includes:
+- Executive summary
+- Key challenges the company faces  
+- Business opportunities
+- Proposed solutions
+- Next steps
+
+Just tell me which company you want to research, and I'll handle everything else!""",
+            
+            """I understand it can be overwhelming! Here's how simple it is:
+            
+You: "Research [Company Name]"
+Me: I'll gather all the info and create a comprehensive plan
+
+Which company should we start with?"""
+        ]
+        
+        import random
+        return random.choice(responses)
+    
+    async def _handle_efficient_request(self, user_input: str) -> str:
+        """Handle requests from efficient users who want quick, structured info"""
+        if not self.current_company:
+            return """No company researched yet. 
+
+Quick start: "Research [Company Name]"
+Example: "Research Microsoft"
+
+I'll generate a 5-section plan with key points only."""
+        
+        # If we have data, provide quick summary
+        return f"""**{self.current_company} - Quick Summary**
+
+• Executive Summary: First 2 key points
+• Main Challenges: Top 3 risks
+• Key Opportunities: Top 3 potential wins
+• Solutions: 3 actionable items
+• Next Steps: Immediate actions
+
+Need specific section? Just ask."""
+    
     async def _handle_general_conversation(self, user_input: str) -> str:
-        """Handle general conversation - adapt slightly based on user mode"""
+        """Handle general conversation - be conversational but guide to task"""
         import random
         
-        # Always professional, but slightly adjust based on user's conversation style
-        if self.user_mode == ConversationMode.EFFICIENT:
-            # User wants efficiency, be brief
-            return "Which company would you like to research?"
-        elif self.user_mode == ConversationMode.CHATTY:
-            # User is chatty, be slightly more conversational
+        input_lower = user_input.lower()
+        
+        # Handle chatty off-topic comments
+        if any(word in input_lower for word in ["coffee", "weather", "tired", "lol", "haha", "anyway"]):
             responses = [
-                "That's interesting! Let's focus on company research. Which company would you like me to look into?",
-                "I appreciate the conversation! Now, which company should we research?",
-                "Thanks for sharing! Let's dive into some company research - which company interests you?"
+                "I hear you! 😊 Now, which company would you like me to research for you?",
+                "Haha, I get it! Let's get back to business - what company should we look into?",
+                "Interesting! By the way, ready to research a company? Which one?"
             ]
             return random.choice(responses)
-        elif self.user_mode == ConversationMode.CONFUSED:
-            # User is confused, be more guiding
-            return "I understand this might be confusing. Let me help - just tell me a company name you'd like to research, and I'll handle the rest."
+        
+        # Handle questions about the bot itself
+        if any(phrase in input_lower for phrase in ["how do you know", "where do you get", "are you sure"]):
+            return "I gather data from public sources and synthesize it into actionable insights. Want me to research a specific company for you?"
+        
+        # Handle requests for non-existent companies
+        if "asdfghjkl" in input_lower or len(input_lower) > 50 and not any(c.isspace() for c in input_lower):
+            return "That doesn't appear to be a real company name. Could you provide a valid company name? For example: Microsoft, Tesla, Apple, etc."
+        
+        # Handle requests for internal/private data
+        if any(phrase in input_lower for phrase in ["internal data", "private information", "confidential", "secret"]):
+            return "I can only access publicly available information. However, I can infer insights from public data like news, announcements, and market trends. Which company should I research using public sources?"
+        
+        # Default conversational response based on mode
+        if self.state == ResearchState.IDLE:
+            return "I'm ready to help you research companies and create account plans. Which company interests you?"
         else:
-            # Normal response
-            responses = [
-                "I'm designed for company research. Would you like me to research a company?",
-                "Let's focus on company research. Which company interests you?",
-                "I can help you research companies. Which one should we start with?"
-            ]
-            return random.choice(responses)
+            return "I'm here to help with company research. What would you like to know?"
     
     def _extract_company_name(self, user_input: str) -> Optional[str]:
         """Extract company name from user input"""
-        # Remove common phrases
-        clean_input = user_input.lower()
+        input_lower = user_input.lower()
+        
+        # Try to extract from specific patterns first
+        patterns = [
+            r"(?:please\s+)?research\s+(\w+[\w\s]*?)(?:\s+company|\s+corp|\s+inc|\s+ltd|$)",
+            r"(?:create|generate|make|need|want)\s+(?:an?\s+)?(?:account\s+)?plan\s+(?:for|about)\s+(\w+[\w\s]*?)(?:\s+company|\s+corp|\s+inc|\s+ltd|$)",
+            r"(?:i\s+)?(?:need|want)\s+(?:an?\s+)?(?:account\s+)?plan\s+(?:for|about)\s+(\w+[\w\s]*?)(?:\s+company|\s+corp|\s+inc|\s+ltd|$)",
+            r"look\s+up\s+(\w+[\w\s]*?)(?:\s+company|\s+corp|\s+inc|\s+ltd|$)",
+        ]
+        
+        for pattern in patterns:
+            match = re.search(pattern, input_lower, re.IGNORECASE)
+            if match:
+                company_name = match.group(1).strip()
+                # Clean up and capitalize
+                company_name = ' '.join(word.capitalize() for word in company_name.split())
+                return company_name
+        
+        # Fallback to simple cleaning
+        clean_input = input_lower
         remove_phrases = [
-            "research", "look up", "look into", "tell me about",
+            "anyway", "research", "look up", "look into", "tell me about",
             "information on", "information about", "find", "search for",
-            "i want to know about", "can you research", "please research"
+            "i want to know about", "can you research", "please research",
+            "make an account plan for", "create account plan for",
+            "i need an account plan for", "i want an account plan for",
+            "account plan for", "plan for"
         ]
         
         for phrase in remove_phrases:
