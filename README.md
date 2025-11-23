@@ -1,21 +1,37 @@
 # Company Research & Account Plan Agent 🤖
 
-An intelligent conversational agent that helps users research companies and generate comprehensive account plans through natural, interactive dialogue.
+An intelligent conversational agent with a modern web interface that helps users research companies and generate comprehensive account plans through natural, interactive dialogue.
 
 ## 🎯 Overview
 
-This agent provides an intuitive, conversation-first approach to company research. Rather than complex commands or forms, users simply chat with the agent to:
-- Research companies from multiple sources
-- Generate detailed account plans
-- Edit and refine sections interactively
+This agent provides an intuitive, conversation-first approach to company research with a full-stack web application. Rather than complex commands or forms, users simply chat with the agent to:
+- Research companies from multiple sources with intelligent caching
+- Generate detailed account plans with concise summaries
+- Edit and refine sections interactively through conversation
 - Get real-time progress updates during research
+- Access everything through a clean, modern web interface
+
+## ✨ Recent Updates (v2.0)
+
+### New Features
+- **🚀 Web Interface**: Modern React frontend with real-time updates
+- **💾 Smart Caching**: Automatic caching of research data to avoid redundant searches
+- **📋 Plan Summaries**: Concise summaries displayed directly in chat
+- **✏️ Conversational Editing**: Natural language editing of plan sections
+- **🎯 Cleaner UI**: Removed unnecessary features for a focused experience
+
+### Performance Improvements
+- Instant loading of previously researched companies
+- No redundant API calls for cached data
+- Faster response times with optimized backend
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 
 1. **Python 3.8+** installed
-2. **API Keys** (add to `config/.env`):
+2. **Node.js 14+** and npm installed
+3. **API Keys** (add to `config/.env`):
    ```env
    GROQ_API_KEY=your_groq_api_key
    MISTRAL_API_KEY=your_mistral_api_key
@@ -25,278 +41,265 @@ This agent provides an intuitive, conversation-first approach to company researc
 ### Installation
 
 ```bash
-# Install required packages
+# Clone the repository
+git clone https://github.com/Achintharya/eightfold_bot.git
+cd eightfold_bot
+
+# Install Python dependencies
 pip install -r requirements.txt
+
+# Install React frontend dependencies
+cd frontend
+npm install
+cd ..
 
 # Create necessary directories
 mkdir -p data articles account_plans config
 ```
 
-### Running the Agent
+### Running the Application
+
+#### Option 1: Web Application (Recommended)
 
 ```bash
-# Main interactive agent
-python company_research_agent.py
+# Terminal 1: Start the backend server
+python main.py
+
+# Terminal 2: Start the frontend
+cd frontend
+npm start
+```
+
+The application will be available at:
+- Frontend: http://localhost:3000 (or 3001 if 3000 is in use)
+- Backend API: http://localhost:8000
+
+#### Option 2: Command Line Interface
+
+```bash
+# Run the interactive CLI agent
+python src/company_research_agent.py
 
 # Run demo scenarios
-python demo_scenarios.py
-
-# Run tests
-python demo_scenarios.py  # Choose option 2 for tests
+python src/demo_scenarios.py
 ```
 
-## 💬 Conversation Modes
+## 💻 Web Interface Features
 
-The agent supports different conversation styles to match user preferences:
+### Main Chat Interface
+- **Real-time messaging** with the AI agent
+- **Typing indicators** for better UX
+- **Markdown rendering** for formatted responses
+- **Status badges** showing current agent state
 
-### 1. **Efficient Mode** 🎯
-- Quick, direct responses
-- Minimal explanations
-- Perfect for users who know what they want
-- Example: "Ready. Company name?" → "Tesla" → "Researching..."
+### Account Plans Sidebar
+- **List of all generated plans** with timestamps
+- **Click to view** full plan in modal
+- **Automatic refresh** when new plans are created
 
-### 2. **Chatty Mode** 😊
-- Friendly, detailed responses
-- Provides context and explanations
-- Great for users who enjoy interaction
-- Uses emojis and enthusiasm
+### Quick Actions
+- **Get Help** - Learn what the agent can do
+- **Check Status** - See current research progress
+- **Research Tesla** - Quick demo button
 
-### 3. **Confused Mode** 🤔
-- Asks for clarification frequently
-- Double-checks understanding
-- Ideal for testing edge cases
-- Shows uncertainty in responses
+### Smart Features
+- **Cache Indicator**: Shows when using cached data
+- **Plan Summaries**: Key points displayed inline
+- **Edit Mode**: Conversational editing interface
 
-### 4. **Normal Mode** ⚖️
-- Balanced approach
-- Professional yet approachable
-- Default mode for most users
+## 🧠 Intelligent Caching System
 
-## 🏗️ Architecture & Design Decisions
+### How It Works
+1. **First Research**: Performs full web search and analysis
+2. **Data Storage**: Caches research data and generated plans
+3. **Subsequent Requests**: Instantly loads from cache
+4. **User Control**: Can request fresh research if needed
 
-### Core Design Philosophy
+### Cache Benefits
+- ⚡ **Instant Response**: No waiting for repeated queries
+- 💰 **API Savings**: Reduces API calls and costs
+- 🔄 **Consistency**: Same data for plan edits
+- 📊 **Performance**: Handles rate limits gracefully
 
-**Conversation First**: The agent prioritizes natural dialogue over command-based interaction. Users shouldn't need to learn special syntax or commands.
-
-### Key Design Decisions
-
-#### 1. **Modular Architecture**
+### Example Flow
 ```
-company_research_agent.py
-├── CompanyResearchAgent (Main logic)
-│   ├── Intent Detection
-│   ├── State Management
-│   ├── Response Generation
-│   └── Research Orchestration
-├── InteractiveSession (User interface)
-└── Integration with existing modules
-    ├── web_context_extract.py (Web scraping)
-    ├── context_summarizer.py (Summarization)
-    └── article_writer.py (Content generation)
+User: "Research Tesla"
+Agent: "Starting fresh research..." [Takes 30-60 seconds]
+
+User: "Research Tesla" (again)
+Agent: "✅ Using cached research data..." [Instant]
 ```
 
-**Rationale**: Leverages existing robust modules while adding conversational layer on top.
+## 📝 Plan Summaries
 
-#### 2. **State-Based Conversation Management**
-```python
-class ResearchState(Enum):
-    IDLE = "idle"
-    GATHERING_INFO = "gathering_info"
-    RESEARCHING = "researching"
-    SUMMARIZING = "summarizing"
-    GENERATING_PLAN = "generating_plan"
-    EDITING = "editing"
-    COMPLETE = "complete"
+### Automatic Summary Generation
+When a plan is created or loaded, the agent automatically generates a concise summary showing:
+- **Executive Summary** (first 200 characters)
+- **Key Challenges** (main points)
+- **Main Opportunities** (highlights)
+- **Proposed Solutions** (core recommendations)
+- **Next Steps** (immediate actions)
+
+### Benefits
+- Quick overview without opening full plan
+- Essential information at a glance
+- Maintains context during conversations
+- Perfect for quick reviews
+
+## ✏️ Conversational Editing
+
+### Three Edit Modes
+
+#### 1. Replace Mode
+```
+User: "Edit the executive summary"
+Agent: [Shows current content]
+User: [Provides new content]
+Agent: "✓ Section updated"
 ```
 
-**Rationale**: Clear state tracking enables:
-- Contextual responses
-- Progress updates
-- Error recovery
-- User guidance
-
-#### 3. **Intent Detection System**
-- Pattern-based intent recognition
-- Fallback to general conversation
-- Context-aware interpretation
-
-**Rationale**: Balances accuracy with flexibility, allowing natural conversation while maintaining functionality.
-
-#### 4. **Progressive Information Gathering**
-```python
-queries = [
-    f"{company_name} company overview products services",
-    f"{company_name} leadership team executives",
-    f"{company_name} recent news announcements",
-    f"{company_name} challenges problems issues"
-]
+#### 2. Regenerate Mode
+```
+User: "Edit the opportunities section"
+Agent: [Shows current content and options]
+User: "Regenerate with focus on sustainability"
+Agent: "✓ Section regenerated with focus on sustainability"
 ```
 
-**Rationale**: Comprehensive research from multiple angles ensures thorough account plans.
+#### 3. Enhance Mode
+```
+User: "Edit the solutions section"
+Agent: [Shows current content]
+User: "Add more details about implementation timeline"
+Agent: "✓ Section enhanced with timeline details"
+```
 
-#### 5. **Real-Time Progress Updates**
-- "I'm finding conflicting information about X, should I dig deeper?"
-- "Currently researching leadership team..."
-- "Summarizing findings..."
+## 🏗️ Architecture
 
-**Rationale**: Keeps users engaged and informed, building trust in the process.
+### Full-Stack Design
+```
+eightfold_bot/
+├── Backend (FastAPI)
+│   ├── main.py                    # API server
+│   ├── src/
+│   │   ├── company_research_agent.py  # Core agent logic
+│   │   ├── web_context_extract.py     # Web scraping
+│   │   ├── context_summarizer.py      # Summarization
+│   │   └── article_writer.py          # Content generation
+│   └── account_plans/              # Generated plans storage
+│
+├── Frontend (React)
+│   ├── src/
+│   │   ├── App.js                 # Main React component
+│   │   ├── App.css                # Styling
+│   │   └── index.js               # Entry point
+│   └── public/
+│
+└── Configuration
+    ├── requirements.txt            # Python dependencies
+    ├── config/.env                # API keys
+    └── data/                      # Cache and working data
+```
 
-## 🎭 Demo Scenarios
+### API Endpoints
 
-### The Confused User 😕
-- Unsure what they want
-- Needs guidance
-- Agent provides gentle steering
-
-### The Efficient User ⚡
-- Knows exactly what they need
-- Wants quick results
-- Agent responds concisely
-
-### The Chatty User 💬
-- Enjoys conversation
-- Goes off-topic
-- Agent redirects politely
-
-### Edge Cases 🔧
-- Empty inputs
-- Gibberish
-- Multiple companies
-- Emoji inputs
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/chat` | POST | Main chat interface with caching support |
+| `/status` | GET | Get agent status and current company |
+| `/plans` | GET | List all generated account plans |
+| `/plan/{filename}` | GET | Get specific plan content |
+| `/edit-plan` | POST | Edit plan sections |
+| `/cache/status` | GET | Check cache status |
+| `/cache/clear` | POST | Clear cache |
 
 ## 📊 Account Plan Structure
 
 Generated account plans include:
-1. **Executive Summary** - High-level overview
+1. **Executive Summary** - High-level overview with innovation focus
 2. **Company Overview** - Products, services, market position
 3. **Key Stakeholders** - Leadership and decision makers
-4. **Business Challenges** - Current pain points
+4. **Business Challenges** - Current pain points and issues
 5. **Opportunities** - Potential value propositions
 6. **Proposed Solutions** - Tailored recommendations
 7. **Engagement Strategy** - Approach for engagement
 8. **Success Metrics** - KPIs and measurements
 9. **Next Steps** - Actionable items
 
-## 🧪 Testing & Evaluation
+## 🎭 Conversation Modes
 
-### Automated Tests
-- Intent detection accuracy
-- Company name extraction
-- State management
-- Conversation mode behavior
+The agent supports different conversation styles to match user preferences:
 
-### Evaluation Criteria
+| Mode | Description | Best For |
+|------|-------------|----------|
+| **Efficient 🎯** | Quick, direct responses | Power users |
+| **Chatty 😊** | Friendly, detailed responses | First-time users |
+| **Confused 🤔** | Asks for clarification | Testing edge cases |
+| **Normal ⚖️** | Balanced approach | Most users |
 
-#### 1. **Conversational Quality** ⭐⭐⭐⭐⭐
-- Natural language understanding
-- Context awareness
-- Appropriate responses
-- Personality consistency
+## 🧪 Testing
 
-#### 2. **Agentic Behavior** ⭐⭐⭐⭐⭐
-- Proactive information gathering
-- Progress updates
-- Error handling
-- User guidance
+### Test the Application
+```bash
+# Test backend API
+curl http://localhost:8000/status
 
-#### 3. **Technical Implementation** ⭐⭐⭐⭐
-- Modular design
-- Error recovery
-- State management
-- Integration quality
+# Test chat endpoint
+curl -X POST http://localhost:8000/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message": "Research Tesla"}'
 
-#### 4. **Intelligence & Adaptability** ⭐⭐⭐⭐⭐
-- Multiple conversation modes
-- Intent recognition
-- Context synthesis
-- Plan generation quality
-
-## 🛠️ Technical Features
-
-### Web Scraping & Research
-- **Crawl4AI** for advanced extraction (when available)
-- **BeautifulSoup** fallback for simple extraction
-- **DuckDuckGo** search as primary
-- **Serper API** as enhanced search option
-
-### Content Processing
-- **CrewAI** for intelligent summarization
-- **Mistral AI** for content generation
-- Context-aware synthesis
-
-### Data Management
-- Atomic file operations
-- Thread-safe writes
-- Automatic backups
-- Version control
-
-## 📁 Project Structure
-
-```
-eightfold_bot/
-├── company_research_agent.py  # Main agent
-├── demo_scenarios.py          # Demo & tests
-├── web_context_extract.py     # Web scraping
-├── context_summarizer.py      # Summarization
-├── article_writer.py          # Content generation
-├── README.md                  # Documentation
-├── requirements.txt           # Dependencies
-├── config/
-│   └── .env                  # API keys
-├── data/                     # Working data
-│   ├── context.json
-│   ├── context.txt
-│   ├── sources.md
-│   └── writing_style.txt
-├── articles/                 # Generated articles
-└── account_plans/           # Generated plans
+# Run automated tests
+python src/demo_scenarios.py
 ```
 
-## 🔄 Workflow
+### Key Test Scenarios
+- ✅ Fresh company research
+- ✅ Cached data retrieval
+- ✅ Plan summary generation
+- ✅ Conversational editing
+- ✅ Error handling and recovery
 
-1. **User Input** → Natural language request
-2. **Intent Detection** → Understand user's goal
-3. **Information Gathering** → Clarify if needed
-4. **Research Phase** → Web scraping & extraction
-5. **Synthesis** → Summarize findings
-6. **Plan Generation** → Create account plan
-7. **Interactive Editing** → Refine sections
-8. **Output** → Save and present results
+## 🔄 Typical Workflow
 
-## 🎯 Use Cases
+1. **Initial Research**
+   - User: "Research Microsoft"
+   - Agent performs comprehensive web search
+   - Generates account plan with summary
 
-### Sales Teams
-- Pre-meeting research
-- Account planning
-- Opportunity identification
+2. **Quick Review**
+   - Summary displayed in chat
+   - Full plan available in sidebar
 
-### Business Development
-- Market research
-- Competitive analysis
-- Partnership evaluation
+3. **Editing**
+   - User: "Edit the challenges section"
+   - Agent shows current content
+   - User provides changes conversationally
 
-### Consultants
-- Client research
-- Industry analysis
-- Strategy development
+4. **Cached Access**
+   - User: "Show me Microsoft plan again"
+   - Instant loading from cache
 
 ## 🚧 Known Limitations
 
 1. **API Dependencies** - Requires API keys for full functionality
-2. **Research Scope** - Limited to publicly available information
-3. **Language** - Currently English only
-4. **Rate Limits** - Subject to API rate limitations
+2. **Rate Limits** - DuckDuckGo may rate limit during heavy use
+3. **Research Scope** - Limited to publicly available information
+4. **Language** - Currently English only
+5. **Browser Compatibility** - Best on modern browsers
 
 ## 🔮 Future Enhancements
 
+- [ ] Real-time collaborative editing
+- [ ] Export to multiple formats (PDF, DOCX)
+- [ ] Integration with CRM systems
 - [ ] Voice interaction support
 - [ ] Multi-language support
-- [ ] Historical research tracking
-- [ ] Collaborative editing
-- [ ] Export to CRM systems
+- [ ] Advanced analytics dashboard
 - [ ] Custom research templates
-- [ ] Sentiment analysis
-- [ ] Competitor comparison
+- [ ] Competitor comparison tools
+- [ ] Automated plan updates
+- [ ] Mobile app version
 
 ## 📝 Example Interaction
 
@@ -304,58 +307,80 @@ eightfold_bot/
 Agent: Hello! I'm here to help you research companies and create account plans. 
        Which company would you like to research?
 
-You: I'm interested in Tesla but not sure what I need exactly
+You: Research Tesla
 
-Agent: No problem! Let me research Tesla for you. I'll gather information about 
-       their products, leadership, recent news, and challenges. This will help 
-       us create a comprehensive account plan.
-
-Agent: Starting research on Tesla...
+Agent: Starting fresh research on Tesla...
        I'll search for information about this company...
+       
+       [After research completes]
+       Account plan generated and saved!
+       
+       📋 Account Plan Summary for Tesla
+       
+       Executive Summary:
+       Tesla is navigating complex challenges including...
+       
+       Key Challenges:
+       - Public backlash and controversy...
+       - Supply chain complexities...
+       
+       [Summary continues...]
 
-[Progress updates during research...]
+You: Edit the executive summary to focus more on innovation
 
-Agent: Research complete! I've generated an account plan for Tesla.
-       Account plan generated and saved to account_plan_Tesla_20231123_194500.md
-
-You: Can you edit the opportunities section to focus more on sustainability?
-
-Agent: Current opportunities content:
+Agent: Current Executive Summary content:
        [Shows current content]
        
-       Please provide the new content or describe the changes you'd like:
+       You can:
+       1. Replace - Provide new content
+       2. Regenerate - Say "regenerate with focus on [aspect]"
+       3. Enhance - Say "add [details]"
+       
+You: Regenerate with focus on technological leadership
+
+Agent: ✓ Executive Summary regenerated with focus on technological leadership
+       [Shows new content]
 ```
 
-## 🏆 Why This Design?
+## 🐛 Troubleshooting
 
-### Prioritizing Conversation Quality
-- Multiple personality modes cater to different users
-- Natural language processing for intuitive interaction
-- Context-aware responses maintain conversation flow
+### CORS Issues
+If you see CORS errors, ensure the backend is configured for your frontend port:
+```python
+# main.py
+allow_origins=["http://localhost:3000", "http://localhost:3001"]
+```
 
-### Demonstrating Agentic Behavior
-- Proactive research from multiple angles
-- Real-time progress updates build trust
-- Autonomous decision-making in research process
+### Rate Limiting
+If experiencing DuckDuckGo rate limits:
+- Wait a few minutes between searches
+- Consider using Serper API key for better limits
 
-### Technical Excellence
-- Modular architecture for maintainability
-- Robust error handling and recovery
-- Integration with proven tools
-
-### Intelligence & Adaptability
-- Adapts conversation style to user preference
-- Learns from conversation context
-- Synthesizes complex information into actionable plans
+### Port Conflicts
+If ports are already in use:
+- Backend: Change port in `main.py`
+- Frontend: It will auto-select next available port
 
 ## 📧 Support & Contribution
 
-For issues, suggestions, or contributions, please create an issue or pull request.
+For issues, suggestions, or contributions:
+- Create an issue on GitHub
+- Submit a pull request
+- Contact: [your-email@example.com]
 
 ## 📄 License
 
 MIT License - Feel free to use and modify as needed.
 
+## 🙏 Acknowledgments
+
+- Built with FastAPI and React
+- Powered by Groq and Mistral AI
+- Web scraping via BeautifulSoup and Crawl4AI
+- UI components from React ecosystem
+
 ---
 
-**Built with ❤️ for natural, intelligent company research**
+**Built with ❤️ for intelligent, efficient company research**
+
+**Version 2.0** | **Last Updated: November 2024**
