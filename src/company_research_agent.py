@@ -87,35 +87,26 @@ class CompanyResearchAgent:
         intent = self._detect_intent(user_input)
         
         # Route to appropriate handler
-        if intent == "company_name":
-            return await self._handle_company_research(user_input)
-        elif intent == "question_about_company":
-            return await self._answer_from_research(user_input)
-        elif intent == "confused_request":
-            return await self._handle_confused_user(user_input)
-        elif intent == "efficient_request":
-            return await self._handle_efficient_request(user_input)
-        elif intent == "empty_input":
+        if intent == "empty_input":
             return "I didn't receive any input. How can I help you research a company?"
         elif intent == "emoji_only":
             return "I see you're using emojis! 😊 But I need text to understand what company you'd like to research."
-        elif intent == "edit_request":
-            return await self._handle_edit_request(user_input)
-        elif intent == "save_plan":
-            return await self._handle_save_plan()
-        elif intent == "clarification":
-            return await self._handle_clarification(user_input)
-        elif intent == "status_check":
-            return self._get_status_update()
-        elif intent == "help":
-            return self._provide_help()
         elif intent == "exit":
             return "Thank you for using the Company Research Agent. Goodbye!"
+        elif intent == "save_plan":
+            return await self._handle_save_plan()
+        elif intent == "edit_request":
+            return await self._handle_edit_request(user_input)
+        elif intent == "clarification":
+            return await self._handle_clarification(user_input)
+        elif intent == "llm_process":
+            # Let LLM handle everything else
+            return await self._handle_llm_process(user_input)
         else:
             return await self._handle_general_conversation(user_input)
     
     def _detect_intent(self, user_input: str) -> str:
-        """Detect the user's intent from their input"""
+        """Let LLM determine intent instead of pattern matching"""
         input_lower = user_input.lower()
         
         # Handle empty/nonsense input
@@ -126,87 +117,22 @@ class CompanyResearchAgent:
         if all(ord(c) > 127 for c in user_input.strip()):
             return "emoji_only"
         
-        # Check for exit commands
+        # Basic exit/save/edit checks (keep these for state management)
         if any(word in input_lower for word in ["exit", "quit", "bye", "goodbye"]):
             return "exit"
         
-        # Check for help requests
-        if any(word in input_lower for word in ["help", "what can you do", "how do you work", "what should i do"]):
-            return "help"
-        
-        # Check for confused/vague requests (high priority for confused users)
-        if any(phrase in input_lower for phrase in [
-            "i don't know", "not sure", "confused", "what should", "can you tell me what",
-            "where to start", "i just need something", "idk"
-        ]):
-            return "confused_request"
-        
-        # Check for save requests
-        if any(word in input_lower for word in ["save", "export", "store", "keep"]) and self.account_plan:
+        if any(word in input_lower for word in ["save", "export"]) and self.account_plan:
             return "save_plan"
         
-        # Check for status inquiries
-        if any(word in input_lower for word in ["status", "progress", "how's it going", "update"]) and self.state != ResearchState.IDLE:
-            return "status_check"
-        
-        # Check for edit requests
-        if any(word in input_lower for word in ["edit", "change", "modify", "update", "regenerate", "improve", "refine"]) and self.account_plan:
+        if any(word in input_lower for word in ["edit", "change", "modify"]) and self.account_plan:
             return "edit_request"
         
-        # Check if providing clarification
+        # If we're waiting for clarification
         if self.state == ResearchState.GATHERING_INFO:
             return "clarification"
         
-        # Check if this is a question about current company (if we have research data)
-        if self.current_company and self.context_summary:
-            # Check for explicit new research request
-            if any(phrase in input_lower for phrase in ["research", "look up", "look into", "find information about", "create account plan", "generate plan"]):
-                # Check if it's about a different company
-                company_patterns = [
-                    r"research\s+(\w+[\w\s]*)",
-                    r"look\s+(?:up|into)\s+(\w+[\w\s]*)",
-                    r"information\s+(?:on|about)\s+(\w+[\w\s]*)",
-                    r"(?:account plan|plan)\s+(?:for|about)\s+(\w+[\w\s]*)",
-                ]
-                for pattern in company_patterns:
-                    match = re.search(pattern, input_lower)
-                    if match:
-                        potential_company = match.group(1).strip()
-                        # If it's a different company, treat as new research
-                        if potential_company.lower() != self.current_company.lower():
-                            return "company_name"
-                # Same company - answer from existing research
-                return "question_about_company"
-            else:
-                # Any other question - answer from existing research
-                return "question_about_company"
-        
-        # Check for EXPLICIT research requests only
-        explicit_research_patterns = [
-            r"(?:please\s+)?research\s+(\w+[\w\s]*)",
-            r"(?:create|generate|make|need|want)\s+(?:an?\s+)?(?:account\s+)?plan\s+(?:for|about)\s+(\w+[\w\s]*)",
-            r"(?:i\s+)?(?:need|want)\s+(?:an?\s+)?(?:account\s+)?plan\s+(?:for|about)\s+(\w+[\w\s]*)",
-            r"(?:i\s+)?(?:need|want)\s+(?:to\s+)?research\s+(\w+[\w\s]*)",
-            r"look\s+up\s+(\w+[\w\s]*)\s+(?:company|corporation|inc|ltd)",
-        ]
-        
-        for pattern in explicit_research_patterns:
-            match = re.search(pattern, input_lower)
-            if match:
-                return "company_name"
-        
-        # Check for request for specific info types (efficient users)
-        if any(phrase in input_lower for phrase in [
-            "key decision", "top risks", "bullet points", "summary", 
-            "just give me", "quick overview"
-        ]):
-            if self.current_company and self.context_summary:
-                return "question_about_company"
-            else:
-                return "efficient_request"
-        
-        # Default to general conversation (not automatic research)
-        return "general"
+        # For everything else, let the LLM handle it
+        return "llm_process"
     
     async def _handle_company_research(self, user_input: str) -> str:
         """Handle company research request with caching"""
@@ -629,36 +555,49 @@ The plan has been preserved and can be accessed anytime from the data folder."""
         return self.response_templates.get("help", "")
     
     async def _handle_confused_user(self, user_input: str) -> str:
-        """Handle confused/vague requests with guidance"""
-        responses = [
-            """I can see you're not sure where to start. Let me help! 
-            
-To create an account plan, I need:
-1. The company name you want to research
-
-That's it! Just say something like "Research Microsoft" or "Create account plan for Tesla"
-
-What company are you interested in?""",
-            
-            """No worries! I'm here to guide you. An account plan includes:
-- Executive summary
-- Key challenges the company faces  
-- Business opportunities
-- Proposed solutions
-- Next steps
-
-Just tell me which company you want to research, and I'll handle everything else!""",
-            
-            """I understand it can be overwhelming! Here's how simple it is:
-            
-You: "Research [Company Name]"
-Me: I'll gather all the info and create a comprehensive plan
-
-Which company should we start with?"""
-        ]
+        """Handle confused/vague requests using LLM for natural guidance"""
         
-        import random
-        return random.choice(responses)
+        context = """You are a helpful company research assistant. The user seems confused or unsure about what they want.
+        
+        Your job is to:
+        1. Acknowledge their uncertainty kindly
+        2. Explain that you can research companies and create account plans
+        3. Guide them to provide a specific company name
+        
+        An account plan includes:
+        - Executive summary
+        - Key challenges the company faces
+        - Business opportunities  
+        - Proposed solutions
+        - Next steps
+        
+        Examples of how users can ask for research:
+        - "Research Microsoft"
+        - "Tell me about Apple"
+        - "Create an account plan for Tesla"
+        - "I want to know about Google"
+        """
+        
+        query = f"""User said: "{user_input}"
+        
+        They seem confused or unsure. Help guide them gently toward specifying a company they'd like to research. 
+        Be empathetic and clear about what you need from them (a company name) to help them."""
+        
+        try:
+            response = generate_chat_response(
+                context,
+                query,
+                silent_mode=True
+            )
+            return response
+        except Exception as e:
+            # Fallback response
+            return """I can see you're not sure where to start. Let me help! 
+            
+To create an account plan, I just need the company name you want to research.
+Just say something like "Research Microsoft" or "Tell me about Tesla"
+
+What company are you interested in?"""
     
     async def _handle_efficient_request(self, user_input: str) -> str:
         """Handle requests from efficient users who want quick, structured info"""
@@ -681,38 +620,163 @@ I'll generate a 5-section plan with key points only."""
 
 Need specific section? Just ask."""
     
+    async def _handle_llm_process(self, user_input: str) -> str:
+        """Let LLM decide whether to research or converse"""
+        
+        # Build context about conversation history
+        recent_history = ""
+        if len(self.conversation_history) > 2:
+            # Include last 2 exchanges for context
+            recent_history = "Recent conversation:\n"
+            for msg in self.conversation_history[-4:]:
+                recent_history += f"{msg['role']}: {msg['content']}\n"
+        
+        # Build context for the LLM
+        context = f"""You are a professional company research assistant that helps create account plans.
+        
+        Current state: {self.state.value}
+        Current company being researched: {self.current_company if self.current_company else 'None'}
+        Has cached research: {list(self.research_cache.keys()) if self.research_cache else 'None'}
+        
+        {recent_history}
+        
+        Your capabilities:
+        - Research companies and gather information from public sources
+        - Create comprehensive account plans with 5 sections
+        - Answer questions about companies you've researched
+        - Edit and refine account plans
+        
+        IMPORTANT: You must decide if the user wants to:
+        1. Research a specific company (they mention a company name with intent to research)
+        2. Ask about a company you've already researched  
+        3. Have a general conversation about business/corporate world
+        
+        If they want to research a company, respond with:
+        "RESEARCH:[CompanyName]" on the first line, then your message.
+        
+        If they're asking about current research, respond with:
+        "ANSWER:" on the first line, then answer from existing research.
+        
+        Otherwise, just respond conversationally."""
+        
+        # Create a query for the LLM
+        query = f"""User said: "{user_input}"
+        
+        Analyze their intent and respond appropriately:
+        - If they mention "tell me about [company]", "research [company]", "I want to know about [company]", etc. with a specific company name, start with "RESEARCH:[CompanyName]" then provide your response.
+        - If they're asking about a company you've already researched, start with "ANSWER:" then provide the answer.
+        - Otherwise, just respond conversationally.
+        
+        IMPORTANT: Do not include your reasoning process in the response. Just provide the actual response to the user.
+        
+        Examples:
+        User: "tell me about Microsoft" 
+        Response: RESEARCH:Microsoft
+        I'll research Microsoft for you right away.
+        
+        User: "I wanna know about the corporate world"
+        Response: The corporate world encompasses a vast landscape of businesses and industries...
+        
+        User: "what do I start with"
+        Response: Great question! To get started with understanding companies and the corporate world..."""
+        
+        try:
+            # Use the LLM to generate a response
+            response = generate_chat_response(
+                context,
+                query,
+                silent_mode=True
+            )
+            
+            # Check if LLM wants to trigger research
+            if response.startswith("RESEARCH:"):
+                # Extract company name
+                lines = response.split('\n')
+                company_line = lines[0]
+                company_name = company_line.replace("RESEARCH:", "").strip()
+                
+                # Get the rest of the message
+                message = '\n'.join(lines[1:]) if len(lines) > 1 else ""
+                
+                # Trigger research
+                if company_name:
+                    self.current_company = company_name
+                    research_response = await self._handle_company_research(f"Research {company_name}")
+                    return f"{message}\n\n{research_response}" if message else research_response
+            
+            elif response.startswith("ANSWER:"):
+                # Answer from existing research
+                lines = response.split('\n')
+                answer = '\n'.join(lines[1:]) if len(lines) > 1 else "Let me check what I know..."
+                
+                if self.current_company and self.context_summary:
+                    return await self._answer_from_research(user_input)
+                else:
+                    return "I don't have any research data loaded yet. Would you like me to research a specific company?"
+            
+            # Otherwise just return the conversational response
+            self.conversation_history.append({"role": "assistant", "content": response})
+            return response
+            
+        except Exception as e:
+            # Fallback to simple response if LLM fails
+            return "I'm here to help you research companies and create account plans. Which company would you like to know about?"
+    
     async def _handle_general_conversation(self, user_input: str) -> str:
-        """Handle general conversation - be conversational but guide to task"""
-        import random
+        """Handle general conversation using Mistral LLM for natural responses"""
         
-        input_lower = user_input.lower()
+        # Build context about conversation history
+        recent_history = ""
+        if len(self.conversation_history) > 2:
+            # Include last 2 exchanges for context
+            recent_history = "Recent conversation:\n"
+            for msg in self.conversation_history[-4:]:
+                recent_history += f"{msg['role']}: {msg['content']}\n"
         
-        # Handle chatty off-topic comments
-        if any(word in input_lower for word in ["coffee", "weather", "tired", "lol", "haha", "anyway"]):
-            responses = [
-                "I hear you! 😊 Now, which company would you like me to research for you?",
-                "Haha, I get it! Let's get back to business - what company should we look into?",
-                "Interesting! By the way, ready to research a company? Which one?"
-            ]
-            return random.choice(responses)
+        # Build context for the LLM
+        context = f"""You are a professional company research assistant that helps create account plans.
         
-        # Handle questions about the bot itself
-        if any(phrase in input_lower for phrase in ["how do you know", "where do you get", "are you sure"]):
-            return "I gather data from public sources and synthesize it into actionable insights. Want me to research a specific company for you?"
+        Current state: {self.state.value}
+        Current company being researched: {self.current_company if self.current_company else 'None'}
         
-        # Handle requests for non-existent companies
-        if "asdfghjkl" in input_lower or len(input_lower) > 50 and not any(c.isspace() for c in input_lower):
-            return "That doesn't appear to be a real company name. Could you provide a valid company name? For example: Microsoft, Tesla, Apple, etc."
+        {recent_history}
         
-        # Handle requests for internal/private data
-        if any(phrase in input_lower for phrase in ["internal data", "private information", "confidential", "secret"]):
-            return "I can only access publicly available information. However, I can infer insights from public data like news, announcements, and market trends. Which company should I research using public sources?"
+        Your capabilities:
+        - Research companies and gather information from public sources
+        - Create comprehensive account plans with 5 sections (Executive Summary, Key Challenges, Opportunities, Proposed Solutions, Next Steps)
+        - Answer questions about companies you've researched
+        - Edit and refine account plans
         
-        # Default conversational response based on mode
-        if self.state == ResearchState.IDLE:
-            return "I'm ready to help you research companies and create account plans. Which company interests you?"
-        else:
-            return "I'm here to help with company research. What would you like to know?"
+        To start research, users can say things like:
+        - "Research [Company Name]"
+        - "Tell me about [Company Name]" 
+        - "Create an account plan for [Company Name]"
+        - "I want to know about [Company Name]"
+        
+        Important: You can only access publicly available information. You cannot access internal or confidential data.
+        
+        Be conversational, helpful, and professional. If the user seems interested in company research but hasn't specified a company, guide them to provide one."""
+        
+        # Create a query for the LLM
+        query = f"""User said: "{user_input}"
+        
+        Respond naturally and helpfully. If they're asking about the corporate world or business in general, acknowledge their interest and guide them toward researching a specific company. 
+        If they mention a company name casually, ask if they'd like you to research it.
+        Keep responses concise but friendly and professional."""
+        
+        try:
+            # Use the LLM to generate a natural response
+            response = generate_chat_response(
+                context,
+                query,
+                silent_mode=True
+            )
+            # Add the response to conversation history
+            self.conversation_history.append({"role": "assistant", "content": response})
+            return response
+        except Exception as e:
+            # Fallback to a simple response if LLM fails
+            return "I'm here to help you research companies and create account plans. Which company would you like to know about?"
     
     def _extract_company_name(self, user_input: str) -> Optional[str]:
         """Extract company name from user input"""

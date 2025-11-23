@@ -1,7 +1,7 @@
 
-## Apple leadership team executives
-- https://www.apple.com/leadership/
-- https://investor.apple.com/leadership-and-governance/
-- https://www.comparably.com/companies/apple/executive-team
-- https://digitaldefynd.com/IQ/c-suite-team-of-apple/
-- https://craft.co/apple/executives
+## Eightfold.ai leadership team executives
+- https://eightfold.ai/company/eightfold-ai-leadership/
+- https://craft.co/eightfold/executives
+- https://rocketreach.co/eightfold-management_b4552875fc97be3a
+- https://www.cbinsights.com/company/eightfoldai/people
+- https://www.crunchbase.com/organization/eightfold/profiles_and_contacts
