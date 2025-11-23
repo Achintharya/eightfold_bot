@@ -267,22 +267,22 @@ class CompanyResearchAgent:
         """Generate an account plan based on research"""
         self.state = ResearchState.GENERATING_PLAN
         
-        # Create account plan structure
+        # Create more concise account plan structure - fewer sections
         plan_sections = {
             "executive_summary": "",
-            "company_overview": "",
-            "key_stakeholders": "",
-            "business_challenges": "",
+            "key_challenges": "",
             "opportunities": "",
             "proposed_solutions": "",
-            "engagement_strategy": "",
-            "success_metrics": "",
             "next_steps": ""
         }
         
-        # Generate each section using the article writer's capability        
+        # Generate each section with conciseness instructions        
         for section, _ in plan_sections.items():
-            section_query = f"Based on the research about {self.current_company}, write the {section.replace('_', ' ')} section for an account plan. Write in a professional business style with clear sections and actionable insights."
+            section_query = f"""Based on the research about {self.current_company}, write a CONCISE {section.replace('_', ' ')} section for an account plan. 
+            
+            IMPORTANT: Keep it brief - maximum 3-4 bullet points or 2-3 short paragraphs. 
+            Focus only on the most critical and actionable points.
+            Be direct and avoid unnecessary elaboration."""
             
             try:
                 section_content = generate_chat_response(
@@ -290,6 +290,9 @@ class CompanyResearchAgent:
                     section_query,
                     silent_mode=True  # Suppress output for cleaner agent interaction
                 )
+                # Limit content length
+                if len(section_content) > 800:
+                    section_content = section_content[:797] + "..."
                 plan_sections[section] = section_content
             except Exception as e:
                 plan_sections[section] = f"[Section generation failed: {str(e)}]"
@@ -600,10 +603,10 @@ The plan has been preserved and can be accessed anytime from the data folder."""
         
         summary = f"**📋 Account Plan Summary for {self.current_company}**\n\n"
         
-        # Extract key points from each section
+        # Extract key points from each section (updated for new structure)
         key_sections = {
             "executive_summary": "**Executive Summary:**",
-            "business_challenges": "**Key Challenges:**",
+            "key_challenges": "**Key Challenges:**",
             "opportunities": "**Main Opportunities:**",
             "proposed_solutions": "**Proposed Solutions:**",
             "next_steps": "**Next Steps:**"
